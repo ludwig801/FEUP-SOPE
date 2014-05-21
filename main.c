@@ -20,8 +20,8 @@ typedef struct
 	unsigned int first; // head of the queue
 	unsigned int last; // tail of the queue
 
-	sem_t empty; // semaphores and mutex for implementing the
-	sem_t full; // producer-consumer paradigm
+	sem_t production; // semaphores and mutex for implementing the
+	sem_t consumption; // producer-consumer paradigm
 	pthread_mutex_t mutex;
 } CircularQueue;
 
@@ -30,12 +30,12 @@ typedef struct
 // Initializes semaphores & mutex needed to implement the producer-consumer paradigm
 // Initializes indexes of the head and tail of the queue
 // TO DO BY STUDENTS: ADD ERROR TESTS TO THE CALLS & RETURN a value INDICATING (UN)SUCESS
-void queue_init(CircularQueue **q, unsigned int capacity) // TO DO: change return value
+void queue_init(CircularQueue **q, unsigned int capacity, unsigned int n) // TO DO: change return value
 {
 	*q = (CircularQueue *) malloc(sizeof(CircularQueue));
 
-	sem_init(&((*q)->empty), 0, capacity);
-	sem_init(&((*q)->full), 0, 0);
+	sem_init(&((*q)->production), 0, n);
+	sem_init(&((*q)->consumption), 0, 0);
 	pthread_mutex_init(&((*q)->mutex), NULL);
 
 	(*q)->v = (QueueElem *) malloc(capacity * sizeof(QueueElem));
@@ -61,6 +61,11 @@ QueueElem queue_get(CircularQueue *q)
 	QueueElem value = q->v[q->first];
 	q->first++;
 	return value;
+}
+
+// Gives the head.
+QueueElem queue_top(CircularQueue *q) {
+	return q->v[q->first];
 }
 
 //------------------------------------------------------------------------------------------
@@ -94,15 +99,54 @@ void queue_fill(CircularQueue *q, const QueueElem n) {
 
 }
 // ************************************************************************************************************************************
+void *comPutaPrima(void *arg) {
+	
+	pthread_t tetas;
+	QueueElem tmp = 0;
+	QueueElem prime = 0;
+
+	CircularQueue * q = (CircularQueue *)arg;
+	
+	sem_wait(&(q->production));
+
+	prime = queue_get(q);
+
+	printf("Prime no: %lu \n", prime);
+
+	CircularQueue *q2;
+	queue_init(&q2, QUEUE_SIZE, 0);
+
+	pthread_create(&tetas, NULL, comPutaPrima, q2);
+
+	do {
+		sem_wait(&(q->production));
+		
+		if(queue_top(q) % prime == 0) {
+			// Remove that bitch.
+			queue_get(q);
+		} else {
+			queue_put(q2, queue_get(q));
+			sem_post(&(q2->production));
+		}
+		
+		
+	} while((tmp = queue_get(q)) != 0);
+	
+	return NULL;
+	
+}
 
 int main( int argc, const char* argv[] )  {
 
+	pthread_t tetas;
+
 	CircularQueue *q;
-	queue_init(&q, QUEUE_SIZE);
+	queue_init(&q, QUEUE_SIZE, QUEUE_SIZE);
 
-	queue_fill(q, 20);
+	queue_fill(q, QUEUE_SIZE);
 
-	queue_print(q);
+	pthread_create(&tetas, NULL, comPutaPrima, q); 
+	pthread_join(tetas, NULL);
 
 	return 0;
 }
