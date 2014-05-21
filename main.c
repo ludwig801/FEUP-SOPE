@@ -4,6 +4,10 @@
 #include <pthread.h>
 
 #define QUEUE_SIZE 10 // TO DO: test your program using different queue sizes
+#define MAX_THREAD 1000 // DONE BY STUDENTS.
+
+pthread_t tetas[MAX_THREAD];
+unsigned int threads = 0;
 
 //------------------------------------------------------------------------------------------
 // Type of the circular queue elements
@@ -85,6 +89,8 @@ void queue_print(CircularQueue *q) {
 		printf("Value: %lu \n", value);
 	}
 
+	printf("Value: %lu \n", value);
+
 }
 
 // Fills a queue with value starting from 2 to n. 
@@ -101,8 +107,6 @@ void queue_fill(CircularQueue *q, const QueueElem n) {
 // ************************************************************************************************************************************
 void *comPutaPrima(void *arg) {
 	
-	pthread_t tetas;
-	QueueElem tmp = 0;
 	QueueElem prime = 0;
 
 	CircularQueue * q = (CircularQueue *)arg;
@@ -113,40 +117,68 @@ void *comPutaPrima(void *arg) {
 
 	printf("Prime no: %lu \n", prime);
 
+	if(!prime) {
+		return NULL;
+	}
+
 	CircularQueue *q2;
 	queue_init(&q2, QUEUE_SIZE, 0);
-
-	pthread_create(&tetas, NULL, comPutaPrima, q2);
+	
+	threads++;
+	pthread_create(&tetas[threads], NULL, comPutaPrima, q2);
 
 	do {
+		//printf("tou fodido\n");
+		//printf("lendo: %lu \n", queue_top(q));
 		sem_wait(&(q->production));
 		
 		if(queue_top(q) % prime == 0) {
 			// Remove that bitch.
+			//printf("remove a bitch %lu \n", queue_top(q));
 			queue_get(q);
 		} else {
+			//printf("Toma la: %lu \n", queue_top(q));
+			pthread_mutex_lock(&(q2->mutex));
 			queue_put(q2, queue_get(q));
 			sem_post(&(q2->production));
+			pthread_mutex_unlock(&(q2->mutex));
 		}
 		
 		
-	} while((tmp = queue_get(q)) != 0);
-	
+	} while(queue_top(q));
+
+	queue_put(q2, 0);
+	sem_post(&(q2->production));
+
 	return NULL;
 	
 }
 
+void *verify(void *args) {
+
+	unsigned int i = 0;
+	while(i < (threads + 1)) {
+		//printf("estou a espera da teta: %d.\n", i);
+		pthread_join(tetas[i], NULL);
+		i++;
+	}
+
+	return NULL;
+}
+
 int main( int argc, const char* argv[] )  {
 
-	pthread_t tetas;
+	pthread_t tid;
 
 	CircularQueue *q;
 	queue_init(&q, QUEUE_SIZE, QUEUE_SIZE);
 
 	queue_fill(q, QUEUE_SIZE);
 
-	pthread_create(&tetas, NULL, comPutaPrima, q); 
-	pthread_join(tetas, NULL);
+	pthread_create(&tetas[threads], NULL, comPutaPrima, q); 
+
+	pthread_create(&tid, NULL, verify, NULL);
+	pthread_join(tid, NULL);
 
 	return 0;
 }
