@@ -6,7 +6,7 @@
 #include <math.h>
 
 #define QUEUE_SIZE 10 // TO DO: test your program using different queue sizes
-#define MAX_THREAD SHRT_MAX // DONE BY STUDENTS.
+#define MAX_THREAD 1000 // DONE BY STUDENTS.
 
 pthread_t tetas[MAX_THREAD];
 unsigned int threads = 0;
@@ -87,9 +87,13 @@ void queue_destroy(CircularQueue *q)
 void queue_print(CircularQueue *q) {
 
 	QueueElem value;
+	int count = 0; 
 	while((value = queue_get(q)) != 0) {
 		printf("Value: %lu \n", value);
+		count++;
 	}
+
+	printf("Size: %d\n", count);
 }
 
 // Fills a queue with value starting from 2 to n. 
@@ -116,20 +120,9 @@ void *comPutaPrima(void *arg) {
 	QueueElem prime = 0;
 	CircularQueue * q = (CircularQueue *)arg;
 
-	//printf("Thread: %d\n", threads);
-	//sem_getvalue(&(q->consumption), &sam);
-	//printf("valor do sam: %d\n", sam);
-
-	//sem_getvalue(&(q->consumption), &sam);
-	//printf("valor do sam: %d\n", sam);	
 	sem_wait(&(q->consumption));
-	//sem_getvalue(&(q->consumption), &sam);
-	//printf("valor do sam: %d\n", sam);
 
 	prime = queue_get(q);
-
-	//printf("Prime no: %lu \n", prime);
-
 	
 	if(!prime) {
 
@@ -137,7 +130,6 @@ void *comPutaPrima(void *arg) {
 			sem_post(&(primes->consumption));
 		}
 
-		//printf("Returning from thread: %d\n", threads);
 		return NULL;
 	}
 
@@ -148,24 +140,15 @@ void *comPutaPrima(void *arg) {
 	pthread_create(&tetas[threads], NULL, comPutaPrima, q2);
 
 	do {
-		//printf("tou fodido\n");
-		//printf("lendo: %lu \n", queue_top(q));
+
 		sem_wait(&(q->consumption));
-		//sem_getvalue(&(q->consumption), &sam);
-		//printf("valor do sam: %d\n", sam);
 		
 		if(queue_top(q) % prime == 0) {
-			// Remove that bitch.
-			//printf("remove a bitch %lu \n", queue_top(q));
 			queue_get(q);
 		} else {
-			//printf("Toma la: %lu \n", queue_top(q));
 			pthread_mutex_lock(&(q2->mutex));
 			queue_put(q2, queue_get(q));
 			sem_post(&(q2->consumption));
-
-			//sem_getvalue(&(q2->consumption), &sam);
-			//printf("valor do sam 2: %d\n", sam);
 
 			pthread_mutex_unlock(&(q2->mutex));
 		}
@@ -180,7 +163,6 @@ void *comPutaPrima(void *arg) {
 
 	pthread_mutex_lock(&(primes->mutex));
 	queue_put(primes, prime);
-	//queue_print(primes);
 	sem_post(&(primes->consumption));
 	pthread_mutex_unlock(&(primes->mutex));
 
@@ -189,36 +171,41 @@ void *comPutaPrima(void *arg) {
 
 int main( int argc, const char* argv[] )  {
 
+
 	if (argc != 2) {
 		printf("Usage: %s <max>\n", argv[0]);
 		return 1;
 	}
 
-	double N = atof(argv[1]);
+	unsigned int N = atoi(argv[1]);
+
+	printf("fodasse: %d\n", N);
+
+	// ========================================
+	//       .|. Container for the shit .|.
+	// ========================================
+	unsigned int max_primes = 1.2 * (((double)N)/log(N));
+	printf("fodasse: %d\n", max_primes);
+	queue_init(&primes, N);
+	// ========================================
 
 	CircularQueue *q;
 
 	queue_init(&q, N);
 
-	// ========================================
-	//       .|. Container for the shit .|.
-	// ========================================
-	int max_primes = 1.2 * (N/log(N));
-	queue_init(&primes, max_primes);
-	// ========================================
+	printf("PA PIÇA CM ISTO FDS CRL DO 15 e do 289 QUESTA MERDA FODASSE ANDAM A TROLLAR PQP A SOPE\n");
 
 	queue_fill(q, N);
 
 	pthread_create(&tetas[threads], NULL, comPutaPrima, q); 
-	//printf("Max size: %d\n", max_primes);
 
 	int sem_value = 0;
 
 	do {
 		sem_getvalue(&(primes->consumption), &sem_value);
-		//printf("valor do sam: %d\n", sem_value);
-	} while(sem_value < max_primes);
+	} while(sem_value < N);
 
+	printf("Threads: %d\n", threads);
 	printf("<<< PRIME QUEUE >>>\n");
 	queue_print(primes);
 
