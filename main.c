@@ -5,24 +5,30 @@
 #include <limits.h>
 #include <math.h>
 
-//#define QUEUE_SIZE 10 // TO DO: test your program using different queue sizes
-#define MAX_THREAD 1000 // DONE BY STUDENTS.
-
-pthread_t tids[MAX_THREAD];
-unsigned int threads = 0;
-unsigned int max_primes = 0;
-unsigned int N = 0;
-
-unsigned short done = 0;
-
-int QUEUE_SIZE = 10;
+#define QUEUE_SIZE 10 
+#define MAX_THREAD 1000
 
 
-//------------------------------------------------------------------------------------------
 // Type of the circular queue elements
 typedef unsigned long QueueElem;
 
-//------------------------------------------------------------------------------------------
+// ===============================================================
+//             GLOBAL VARIABLES
+// ===============================================================
+pthread_t tids[MAX_THREAD];
+unsigned int threads = 0;
+unsigned int N = 0;
+
+QueueElem * primes;
+unsigned int p_count = 0;
+pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
+// ===============================================================
+// ===============================================================
+
+// ===============================================================
+//             CIRCULAR QUEUES
+// ===============================================================
+
 // Struct for representing a "circular queue"
 // Space for the queue elements will be allocated dinamically by queue_init()
 typedef struct
@@ -40,7 +46,7 @@ typedef struct
 
 } CircularQueue;
 
-//------------------------------------------------------------------------------------------
+
 // Allocates space for circular queue 'q' having 'capacity' number of elements
 // Initializes semaphores & mutex needed to implement the producer-consumer paradigm
 // Initializes indexes of the head and tail of the queue
@@ -61,7 +67,6 @@ void queue_init(CircularQueue **q, unsigned int capacity) // TO DO: change retur
 	(*q)->number = 0;
 }
 
-//------------------------------------------------------------------------------------------
 // Inserts 'value' at the tail of queue 'q'
 // DONE BY STUDENTS.
 void queue_put(CircularQueue *q, QueueElem value)
@@ -73,7 +78,6 @@ void queue_put(CircularQueue *q, QueueElem value)
 	sem_post(&(q->production));
 }
 
-//------------------------------------------------------------------------------------------
 // Removes element at the head of queue 'q' and returns its 'value'
 QueueElem queue_get(CircularQueue *q)
 {	
@@ -86,7 +90,6 @@ QueueElem queue_get(CircularQueue *q)
 	return value;
 }
 
-//------------------------------------------------------------------------------------------
 // Removes element at the head of queue 'q' and returns its 'value'
 QueueElem queue_get_special(CircularQueue *q)
 {	
@@ -101,29 +104,12 @@ QueueElem queue_top(CircularQueue *q) {
 	return q->v[q->first];
 }
 
-//------------------------------------------------------------------------------------------
 // Frees space allocated for the queue elements and auxiliary management data
 // Must be called when the queue is no more needed
 void queue_destroy(CircularQueue *q)
 {
-	//free(q->v);
-	//free(q);
-}
-
-// Prints queue.
-// DONE BY STUDENTS.
-void queue_print(CircularQueue *q) {
-
-	QueueElem value;
-	int count = 0;
-
-	sem_getvalue(&(q->production), &count);
-	printf("Size of queue: %d\n", count);
-
-	for(; count >= 0; count--) {
-		value = queue_get(q);
-		printf("Value: %lu \n", value);
-	}
+	free(q->v);
+	free(q);
 }
 
 // Fills a queue with value starting from 2 to n. 
@@ -138,17 +124,29 @@ void queue_fill(CircularQueue *q, const QueueElem n) {
 
 	queue_put(q, 0);
 }
-// ************************************************************************************************************************************
+// ===============================================================
+// ===============================================================
 
 
-QueueElem * primes;
-unsigned int p_count = 0;
-pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
-
+// ===============================================================
+//             PRIMES ARRAY
+// ===============================================================
+// Allocates memory for the primes' array.
 void initPrimes(int size) {
 	primes = (QueueElem *) malloc(size * sizeof(QueueElem));
 }
 
+// Inserts a new prime to the primes' array.
+void insertPrime(QueueElem value) {
+
+	pthread_mutex_lock(&mut);
+	primes[p_count] = value;
+	p_count++;
+	pthread_mutex_unlock(&mut);
+	
+}
+
+// Prints all primes' array.
 void printPrimes() {
 	unsigned int i = 0;
 	printf("====================\n");
@@ -157,69 +155,53 @@ void printPrimes() {
 	}
 	printf("====================\n");
 }
+// ===============================================================
+// ===============================================================
 
-void insertPrime(QueueElem value) {
 
-	pthread_mutex_lock(&mut);
-	primes[p_count] = value;
-	//printf("Inserted: %lu, in: %d\n", value, p_count);
-	p_count++;
-	pthread_mutex_unlock(&mut);
-	
-}
-
+// ===============================================================
+//             THREAD
+// ===============================================================
 void *computePrimes(void *arg) {
 
 	CircularQueue * queue = (CircularQueue *)arg;
-	QueueElem prime = 0;
-	QueueElem value = 0;
+	QueueElem prime = 0, value = 0;
 
 	prime = queue_get(queue);
-
-	//
-	// Stoping condition: prime > sqrt(N)
-	//
+	
+	/* Stoping condition */
 	if(prime > (int) sqrt(N)) {
 
-		while((value = queue_get(queue)) != 0) {
-
-			//
-			// Insert the prime in the prime array
-			//	
-			insertPrime(value);
-		}
+		while((value = queue_get(queue))) { insertPrime(value); }
 
 	}
 	else {
-		// Creates shared queue
+		/* Creates shared queue. */
 		CircularQueue *new_queue;
 		queue_init(&new_queue, QUEUE_SIZE);
 		new_queue->number = queue->number + 1;
 	
-		// Creates new thread
+		/* Creates new thread. */
 		threads++;
 		pthread_create(&tids[threads], NULL, computePrimes, new_queue);
 
-		do {
-			value = queue_get(queue);
-			// if not multiple of the last computed prime (possible new prime)
-			if((value % prime) != 0)  {
-				queue_put(new_queue, value);
-			}
-		} while(value != 0);
+		 while((value = queue_get(queue))) { /* Checks whether a value of the queue is a prime. */
+
+			if((value % prime))  { queue_put(new_queue, value); }
+
+		}
 
 		queue_put(new_queue, 0);	/* terminator value */	
 	}
 
-	//
-	// Insert the prime in the prime array
-	//
 	insertPrime(prime);
 
 	queue_destroy(queue);
 
 	pthread_exit(NULL);	
 }
+// ===============================================================
+// ===============================================================
 
 int cmpfunc (const void * a, const void * b)
 {
@@ -236,11 +218,13 @@ int main( int argc, const char* argv[] )  {
 	}
 
 	CircularQueue *initial_queue;
+	unsigned int max_primes = 0;
 
 	// ===============================================
 	// 			INPUT
 	// ===============================================
 	N = atoi(argv[1]);
+	
 	max_primes = 1.2 * (((double)N)/log(N));
 	// ===============================================
 
@@ -249,6 +233,8 @@ int main( int argc, const char* argv[] )  {
 	// All possible integers queue.
 	queue_init(&initial_queue, N);
 	queue_fill(initial_queue, N);
+
+	printf("Computing...\n");
 
 	// Creates initial thread
 	pthread_create(&tids[threads], NULL, computePrimes, initial_queue);
