@@ -1,3 +1,20 @@
+/*
+
+		PROJECT 2 - PRIME NUMBERS GENERATOR 
+
+	AUTHORS: 
+		Kevin Amorim - ei12057@fe.up.pt
+		Luís Magalhães - ei12054@fe.up.pt
+
+	Faculdade de Engenharia da Universidade do Porto (FEUP) 
+	Sistemas Operativos
+
+	24th May, 2014
+	
+	Done by students!
+*/
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <semaphore.h>
@@ -149,11 +166,11 @@ void insertPrime(QueueElem value) {
 // Prints all primes' array.
 void printPrimes() {
 	unsigned int i = 0;
-	printf("====================\n");
+	printf("--------------------\n");
 	for(; i < p_count; i++) {
-		printf("%lu\n", primes[i]);
+		printf("  %lu\n", primes[i]);
 	}
-	printf("====================\n");
+	printf("--------------------\n");
 }
 // ===============================================================
 // ===============================================================
@@ -213,7 +230,7 @@ int cmpfunc (const void * a, const void * b)
 int main( int argc, const char* argv[] )  {
 
 	if (argc != 2) {
-		printf("Usage: %s <max>\n", argv[0]);
+		printf("Usage: %s <unsigned long LIMIT>\n", argv[0]);
 		return 1;
 	}
 
@@ -224,6 +241,9 @@ int main( int argc, const char* argv[] )  {
 	// 			INPUT
 	// ===============================================
 	N = atoi(argv[1]);
+
+	/* Checks input */
+	if(N < 2) { return 2; }
 	
 	max_primes = 1.2 * (((double)N)/log(N));
 	// ===============================================
@@ -246,6 +266,8 @@ int main( int argc, const char* argv[] )  {
 	
 	qsort(primes, p_count, sizeof(QueueElem), cmpfunc);
 	printPrimes();
+
+	free(primes);
 
 	return 0;
 }
